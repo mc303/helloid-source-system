@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HR Admin UI</title>
+  <style>
+    /* ─────────────────────────────────────────────────────────────────────────
+       Basic “tabbed” layout and table styling
+    ───────────────────────────────────────────────────────────────────────── */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 1rem;
+      max-width: 1000px;
+      line-height: 1.5;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Tab buttons */
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #ccc;
+      margin-bottom: 1rem;
+    }
+    .tab-button {
+      flex: 1;
+      padding: 0.75rem;
+      text-align: center;
+      cursor: pointer;
+      background: #f5f5f5;
+      border: 1px solid #ccc;
+      border-bottom: none;
+      margin-right: 0.25rem;
+    }
+    .tab-button.active {
+      background: white;
+      border-top: 2px solid #007bff;
+      font-weight: bold;
+    }
+
+    /* Tab content sections */
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      background: #f2f2f2;
+    }
+
+    form {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem 2rem;
+    }
+    form > div {
+      display: flex;
+      flex-direction: column;
+    }
+    form label {
+      font-weight: bold;
+      margin-bottom: 0.25rem;
+    }
+    form input, form select {
+      padding: 0.4rem;
+      font-size: 1rem;
+    }
+    form button {
+      grid-column: span 3;
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      margin-top: 0.5rem;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    form button:hover {
+      background: #0056b3;
+    }
+
+    .actions button {
+      margin-right: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .actions button.edit {
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 3px;
+    }
+    .actions button.archive {
+      background: #ffc107;
+      color: black;
+      border: none;
+      border-radius: 3px;
+    }
+    .actions button.delete {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 3px;
+    }
+
+    .error {
+      color: red;
+      margin-top: 0.5rem;
+    }
+
+    .toggle-archived {
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>HR Admin UI</h1>
+
+  <!-- Tab Buttons -->
+  <div class="tabs">
+    <div class="tab-button active" data-tab="employees-tab">Employees</div>
+    <div class="tab-button" data-tab="employments-tab">Employments</div>
+    <div class="tab-button" data-tab="positions-tab">Positions</div>
+  </div>
+
+  <!-- Employees Tab -->
+  <section id="employees-tab" class="tab-content active">
+    <h2>Employees</h2>
+    <label class="toggle-archived">
+      <input type="checkbox" id="show-archived-employees" /> Show archived
+    </label>
+    <table id="employees-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Initials</th>
+          <th>Given Name</th>
+          <th>Nick Name</th>
+          <th>Family Name</th>
+          <th>Prefix</th>
+          <th>Partner Name</th>
+          <th>Partner Prefix</th>
+          <th>Convention</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Hire Date</th>
+          <th>Term Date</th>
+          <th>Archived?</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <form id="employee-form">
+      <h3 id="employee-form-title">Add New Employee</h3>
+      <div>
+        <label for="emp-initials">Initials</label>
+        <input type="text" id="emp-initials" name="initials" placeholder="e.g. J.S." />
+      </div>
+      <div>
+        <label for="emp-given_name">Given Name *</label>
+        <input type="text" id="emp-given_name" name="given_name" required />
+      </div>
+      <div>
+        <label for="emp-nick_name">Nick Name</label>
+        <input type="text" id="emp-nick_name" name="nick_name" />
+      </div>
+      <div>
+        <label for="emp-family_name">Family Name *</label>
+        <input type="text" id="emp-family_name" name="family_name" required />
+      </div>
+      <div>
+        <label for="emp-family_prefix">Family Prefix</label>
+        <input type="text" id="emp-family_prefix" name="family_prefix" />
+      </div>
+      <div>
+        <label for="emp-family_partner">Partner Family Name</label>
+        <input type="text" id="emp-family_partner" name="family_partner" />
+      </div>
+      <div>
+        <label for="emp-family_partner_prefix">Partner Prefix</label>
+        <input type="text" id="emp-family_partner_prefix" name="family_partner_prefix" />
+      </div>
+      <div>
+        <label for="emp-name_convention">Convention *</label>
+        <select id="emp-name_convention" name="name_convention" required>
+          <option value="B">B (Birth only)</option>
+          <option value="BP">BP (Birth + Partner)</option>
+          <option value="P">P (Partner only)</option>
+          <option value="PB">PB (Partner + Birth)</option>
+        </select>
+      </div>
+      <div>
+        <label for="emp-date_of_birth">Date of Birth *</label>
+        <input type="date" id="emp-date_of_birth" name="date_of_birth" required />
+      </div>
+      <div>
+        <label for="emp-email">Email *</label>
+        <input type="email" id="emp-email" name="email" required />
+      </div>
+      <div>
+        <label for="emp-phone_number">Phone Number</label>
+        <input type="text" id="emp-phone_number" name="phone_number" />
+      </div>
+      <div>
+        <label for="emp-hire_date">Hire Date *</label>
+        <input type="date" id="emp-hire_date" name="hire_date" required />
+      </div>
+      <div>
+        <label for="emp-termination_date">Termination Date</label>
+        <input type="date" id="emp-termination_date" name="termination_date" />
+      </div>
+      <div>
+        <label for="emp-is_archived">Archived?</label>
+        <select id="emp-is_archived" name="is_archived">
+          <option value="false" selected>No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+      <button type="submit" id="emp-submit-button">Create Employee</button>
+      <div id="emp-form-error" class="error"></div>
+    </form>
+  </section>
+
+  <!-- Employments Tab -->
+  <section id="employments-tab" class="tab-content">
+    <h2>Employments</h2>
+    <label class="toggle-archived">
+      <input type="checkbox" id="show-archived-employments" /> Show archived
+    </label>
+    <table id="employments-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Employee ID</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Status</th>
+          <th>Archived?</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <form id="employment-form">
+      <h3 id="employment-form-title">Add New Employment</h3>
+      <div>
+        <label for="empm-employee_id">Employee ID *</label>
+        <input type="number" id="empm-employee_id" name="employee_id" required min="1" />
+      </div>
+      <div>
+        <label for="empm-start_date">Start Date *</label>
+        <input type="date" id="empm-start_date" name="employment_start_date" required />
+      </div>
+      <div>
+        <label for="empm-end_date">End Date</label>
+        <input type="date" id="empm-end_date" name="employment_end_date" />
+      </div>
+      <div>
+        <label for="empm-status">Status *</label>
+        <input type="text" id="empm-status" name="employment_status" required placeholder="e.g. ACTIVE" />
+      </div>
+      <div>
+        <label for="empm-is_archived">Archived?</label>
+        <select id="empm-is_archived" name="is_archived">
+          <option value="false" selected>No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+      <button type="submit" id="empm-submit-button">Create Employment</button>
+      <div id="empm-form-error" class="error"></div>
+    </form>
+  </section>
+
+  <!-- Positions Tab -->
+  <section id="positions-tab" class="tab-content">
+    <h2>Positions</h2>
+    <label class="toggle-archived">
+      <input type="checkbox" id="show-archived-positions" /> Show archived
+    </label>
+    <table id="positions-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Employment ID</th>
+          <th>Department ID</th>
+          <th>Team ID</th>
+          <th>Title</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Location</th>
+          <th>Archived?</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <form id="position-form">
+      <h3 id="position-form-title">Add New Position</h3>
+      <div>
+        <label for="pos-employment_id">Employment ID *</label>
+        <input type="number" id="pos-employment_id" name="employment_id" required min="1" />
+      </div>
+      <div>
+        <label for="pos-department_id">Department ID *</label>
+        <input type="number" id="pos-department_id" name="department_id" required min="1" />
+      </div>
+      <div>
+        <label for="pos-team_id">Team ID</label>
+        <input type="number" id="pos-team_id" name="team_id" min="1" />
+      </div>
+      <div>
+        <label for="pos-title">Title *</label>
+        <input type="text" id="pos-title" name="position_title" required />
+      </div>
+      <div>
+        <label for="pos-start_date">Start Date *</label>
+        <input type="date" id="pos-start_date" name="start_date" required />
+      </div>
+      <div>
+        <label for="pos-end_date">End Date</label>
+        <input type="date" id="pos-end_date" name="end_date" />
+      </div>
+      <div>
+        <label for="pos-location">Location</label>
+        <input type="text" id="pos-location" name="location" />
+      </div>
+      <div>
+        <label for="pos-is_archived">Archived?</label>
+        <select id="pos-is_archived" name="is_archived">
+          <option value="false" selected>No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+      <button type="submit" id="pos-submit-button">Create Position</button>
+      <div id="pos-form-error" class="error"></div>
+    </form>
+
+  <script src="main.js"></script>
+</body>
+</html>
