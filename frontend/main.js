@@ -1,501 +1,578 @@
-// main.js: vanilla JS to handle CRUD + Archive for Employees, Employments, Positions
+// Config for columns to display and their headers
+const tableConfigs = {
+  Contracts: {
+    endpoint: "contracts",
+    columns: [
+      "person_id",
+      "contract_external_id",
+      "start_date",
+      "end_date",
+      "context_in_conditions",
+      "type_code",
+      "type_description",
+      "fte",
+      "hours_per_week",
+      "percentage",
+      "sequence",
+      "location_id",
+      "cost_center_id",
+      "cost_bearer_id",
+      "employer_id",
+      "manager_person_id",
+      "team_id",
+      "department_id",
+      "division_id",
+      "title_id",
+      "organization_id",
+    ],
+    headers: [
+      "Person ID",
+      "Contract ID",
+      "Start Date",
+      "End Date",
+      "Context",
+      "Type Code",
+      "Type Description",
+      "FTE",
+      "Hours/Week",
+      "Percentage",
+      "Sequence",
+      "Location",
+      "Cost Center",
+      "Cost Bearer",
+      "Employer",
+      "Manager",
+      "Team",
+      "Department",
+      "Division",
+      "Title",
+      "Organization",
+    ],
+    searchableFields: {
+      contract_external_id: { type: "text", label: "Contract ID" },
+      type_code: { type: "text", label: "Type Code" },
+      type_description: { type: "text", label: "Type Description" },
+      start_date: { type: "date", label: "Start Date" },
+      end_date: { type: "date", label: "End Date" },
+      fte: { type: "number", label: "FTE" },
+      hours_per_week: { type: "number", label: "Hours/Week" },
+    },
+  },
+  Departments: {
+    endpoint: "departments",
+    columns: [
+      "external_id",
+      "display_name",
+      "code",
+      "parent_external_id",
+      "manager_person_id",
+    ],
+    headers: [
+      "External ID",
+      "Display Name",
+      "Code",
+      "Parent ID",
+      "Manager Person ID",
+    ],
+    searchableFields: {
+      external_id: { type: "text", label: "External ID" },
+      display_name: { type: "text", label: "Display Name" },
+      code: { type: "text", label: "Code" },
+    },
+  },
+  Contacts: {
+    endpoint: "contacts",
+    columns: [
+      "person_id",
+      "type",
+      "email",
+      "phone_mobile",
+      "phone_fixed",
+      "address_street",
+      "address_street_ext",
+      "address_house_number",
+      "address_house_number_ext",
+      "address_postal",
+      "address_locality",
+      "address_country",
+    ],
+    headers: [
+      "Person ID",
+      "Type",
+      "Email",
+      "Mobile",
+      "Fixed",
+      "Street",
+      "Street Ext",
+      "House #",
+      "House # Ext",
+      "Postal",
+      "Locality",
+      "Country",
+    ],
+    searchableFields: {
+      type: { type: "text", label: "Type" },
+      email: { type: "text", label: "Email" },
+      phone_mobile: { type: "text", label: "Mobile" },
+      phone_fixed: { type: "text", label: "Fixed" },
+      address_locality: { type: "text", label: "Locality" },
+      address_country: { type: "text", label: "Country" },
+    },
+  },
+};
 
-/** CONFIGURATION **/
-const API_URL = 'http://localhost:3000'; // Change if PostgREST is elsewhere
+const API_BASE = "http://localhost:3000";
+let currentEntity = "Contracts";
+let currentData = [];
+let activeFilters = {};
+let currentPage = 0;
+const pageSize = 50;
+let isLoading = false;
+let hasMoreData = true;
+let observer = null;
 
-/** UTILITY: Simplify fetch + JSON error handling **/
-async function requestJSON(url, options = {}) {
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    let errorMsg = `(${res.status})`;
-    try {
-      const err = await res.json();
-      if (err.message) errorMsg = err.message;
-    } catch {}
-    throw new Error(errorMsg);
-  }
-  return res.status === 204 ? null : res.json();
+function resetPagination() {
+  currentPage = 0;
+  hasMoreData = true;
+  currentData = [];
 }
 
-/** TAB SWITCHING LOGIC **/
-const tabs = document.querySelectorAll('.tab-button');
-tabs.forEach((btn) =>
-  btn.addEventListener('click', () => {
-    tabs.forEach((b) => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach((sec) => sec.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(btn.dataset.tab).classList.add('active');
-  })
-);
+function setHeader(title) {
+  document.getElementById("header-title").textContent = title;
+}
 
-/** EMPLOYEES: CRUD + Archive **/
-const empTableBody = document.querySelector('#employees-table tbody');
-const empForm = document.getElementById('employee-form');
-const empFormTitle = document.getElementById('employee-form-title');
-const empSubmitButton = document.getElementById('emp-submit-button');
-const empErrorDiv = document.getElementById('emp-form-error');
-const empShowArchivedCheckbox = document.getElementById('show-archived-employees');
-let empEditId = null;
+function updateRecordCounter(count) {
+  document.getElementById("record-counter").textContent = `${count} records`;
+}
 
-async function loadEmployees() {
-  empTableBody.innerHTML = '';
-  const showArchived = empShowArchivedCheckbox.checked;
-  const filter = showArchived ? '' : '?is_archived=eq.false';
+function renderTable(entity, data, append = false) {
+  const config = tableConfigs[entity];
+  if (!config) return;
+  const { columns, headers } = config;
+
+  let html = "";
+  if (!append) {
+    html = `
+      <div class="overflow-x-auto" style="max-height: calc(100vh - 4rem); overflow-y: auto;" id="table-container">
+        <table class="min-w-full border border-gray-300 text-xs">
+          <thead class="bg-gray-100 sticky top-0 z-10">
+            <tr>
+              ${headers
+                .map(
+                  (h) =>
+                    `<th class="px-2 py-2 border-b border-gray-300 font-semibold text-left whitespace-nowrap">${h}</th>`
+                )
+                .join("")}
+            </tr>
+          </thead>
+          <tbody id="table-body">
+    `;
+  }
+
+  html += data
+    .map(
+      (row) => `
+    <tr class="hover:bg-gray-50">
+      ${columns
+        .map(
+          (col) =>
+            `<td class="px-2 py-1 border-b border-gray-200 whitespace-nowrap">${
+              row[col] ?? ""
+            }</td>`
+        )
+        .join("")}
+    </tr>
+  `
+    )
+    .join("");
+
+  if (!append) {
+    html += `
+          </tbody>
+        </table>
+        <div id="loading-indicator" class="hidden py-4 text-center text-gray-500">
+          Loading more data...
+        </div>
+      </div>
+    `;
+    document.getElementById("main-content").innerHTML = html;
+  } else {
+    document.getElementById("table-body").insertAdjacentHTML("beforeend", html);
+  }
+
+  updateRecordCounter(currentData.length);
+}
+
+function buildQueryParams(searchTerm, filters, page = 0) {
+  const params = new URLSearchParams();
+
+  // Quick search across all fields using OR
+  if (searchTerm) {
+    const searchFields = Object.keys(
+      tableConfigs[currentEntity].searchableFields
+    );
+    const searchConditions = searchFields.map(
+      (field) => `${field}.ilike.*${searchTerm}*`
+    );
+    params.append("or", `(${searchConditions.join(",")})`);
+  }
+
+  // Advanced filters
+  Object.entries(filters).forEach(([field, value]) => {
+    if (!value) return;
+
+    const fieldConfig = tableConfigs[currentEntity].searchableFields[field];
+    if (!fieldConfig) return;
+
+    switch (fieldConfig.type) {
+      case "text":
+        params.append(field, `ilike.*${value}*`);
+        break;
+      case "number":
+        if (value.startsWith(">")) {
+          params.append(field, `gt.${value.substring(1)}`);
+        } else if (value.startsWith("<")) {
+          params.append(field, `lt.${value.substring(1)}`);
+        } else if (value.startsWith(">=")) {
+          params.append(field, `gte.${value.substring(2)}`);
+        } else if (value.startsWith("<=")) {
+          params.append(field, `lte.${value.substring(2)}`);
+        } else {
+          params.append(field, `eq.${value}`);
+        }
+        break;
+      case "date":
+        if (value.startsWith(">")) {
+          params.append(field, `gt.${value.substring(1)}`);
+        } else if (value.startsWith("<")) {
+          params.append(field, `lt.${value.substring(1)}`);
+        } else if (value.startsWith(">=")) {
+          params.append(field, `gte.${value.substring(2)}`);
+        } else if (value.startsWith("<=")) {
+          params.append(field, `lte.${value.substring(2)}`);
+        } else {
+          params.append(field, `eq.${value}`);
+        }
+        break;
+    }
+  });
+
+  // Add pagination
+  params.append("limit", pageSize);
+  params.append("offset", page * pageSize);
+
+  // Add entity-specific ordering
+  switch (currentEntity) {
+    case "Contracts":
+      params.append("order", "contract_external_id.desc");
+      break;
+    case "Departments":
+      params.append("order", "external_id.desc");
+      break;
+    case "Contacts":
+      params.append("order", "person_id.desc");
+      break;
+  }
+
+  return params.toString();
+}
+
+async function checkApiConnection() {
   try {
-    const employees = await requestJSON(`${API_URL}/employees${filter}&order=id.asc`);
-    if (employees.length === 0) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="15" style="text-align:center;">No employees found.</td>`;
-      empTableBody.appendChild(tr);
-      return;
-    }
-    for (const emp of employees) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${emp.id}</td>
-        <td>${emp.initials || ''}</td>
-        <td>${emp.given_name || ''}</td>
-        <td>${emp.nick_name || ''}</td>
-        <td>${emp.family_name || ''}</td>
-        <td>${emp.family_name_prefix || ''}</td>
-        <td>${emp.family_name_partner || ''}</td>
-        <td>${emp.family_name_partner_prefix || ''}</td>
-        <td>${emp.name_convention || ''}</td>
-        <td>${emp.email || ''}</td>
-        <td>${emp.phone_number || ''}</td>
-        <td>${emp.hire_date || ''}</td>
-        <td>${emp.termination_date || ''}</td>
-        <td>${emp.is_archived}</td>
-        <td class="actions">
-          <button class="edit" data-id="${emp.id}">Edit</button>
-          <button class="archive" data-id="${emp.id}">${emp.is_archived ? 'Unarchive' : 'Archive'}</button>
-          <button class="delete" data-id="${emp.id}">Delete</button>
-        </td>
-      `;
-      empTableBody.appendChild(tr);
-    }
-  } catch (err) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="15" style="color:red;text-align:center;">Error: ${err.message}</td>`;
-    empTableBody.appendChild(tr);
+    const res = await fetch(`${API_BASE}/contracts?limit=1`);
+    return res.ok;
+  } catch (e) {
+    console.error("API Connection Error:", e);
+    return false;
   }
 }
 
-empShowArchivedCheckbox.addEventListener('change', () => {
-  resetEmployeeForm();
-  loadEmployees();
-});
-
-empTableBody.addEventListener('click', async (evt) => {
-  const btn = evt.target;
-  if (!btn.dataset.id) return;
-  const id = btn.dataset.id;
-
-  if (btn.classList.contains('edit')) {
-    try {
-      const emp = await requestJSON(`${API_URL}/employees?id=eq.${id}`);
-      if (!emp.length) throw new Error('Employee not found');
-      populateEmployeeForm(emp[0]);
-    } catch (err) {
-      empErrorDiv.textContent = err.message;
-    }
-  } else if (btn.classList.contains('archive')) {
-    const shouldArchive = btn.textContent.trim() === 'Archive';
-    try {
-      await requestJSON(`${API_URL}/employees?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({is_archived: shouldArchive}),
-      });
-      resetEmployeeForm();
-      loadEmployees();
-    } catch (err) {
-      empErrorDiv.textContent = err.message;
-    }
-  } else if (btn.classList.contains('delete')) {
-    if (!confirm('Delete permanently?')) return;
-    try {
-      await requestJSON(`${API_URL}/employees?id=eq.${id}`, {method: 'DELETE'});
-      resetEmployeeForm();
-      loadEmployees();
-    } catch (err) {
-      empErrorDiv.textContent = err.message;
-    }
-  }
-});
-
-function populateEmployeeForm(emp) {
-  empFormTitle.textContent = `Edit Employee (ID ${emp.id})`;
-  empSubmitButton.textContent = 'Update Employee';
-  empErrorDiv.textContent = '';
-  empEditId = emp.id;
-  empForm.initials.value = emp.initials || '';
-  empForm.given_name.value = emp.given_name || '';
-  empForm.nick_name.value = emp.nick_name || '';
-  empForm.family_name.value = emp.family_name || '';
-  empForm.family_prefix.value = emp.family_name_prefix || '';
-  empForm.family_partner.value = emp.family_name_partner || '';
-  empForm.family_partner_prefix.value = emp.family_name_partner_prefix || '';
-  empForm.name_convention.value = emp.name_convention || 'B';
-  empForm.date_of_birth.value = emp.date_of_birth || '';
-  empForm.email.value = emp.email || '';
-  empForm.phone_number.value = emp.phone_number || '';
-  empForm.hire_date.value = emp.hire_date || '';
-  empForm.termination_date.value = emp.termination_date || '';
-  empForm.is_archived.value = emp.is_archived ? 'true' : 'false';
+function showError(message, details = "") {
+  const errorHtml = `
+    <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+      <div class="flex items-center">
+        <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 class="text-red-800 font-medium">${message}</h3>
+      </div>
+      ${details ? `<p class="mt-2 text-sm text-red-600">${details}</p>` : ""}
+      <div class="mt-4">
+        <p class="text-sm text-gray-600">Please check:</p>
+        <ul class="list-disc list-inside text-sm text-gray-600 mt-1">
+          <li>Is PostgREST running at ${API_BASE}?</li>
+          <li>Is the database connection working?</li>
+          <li>Are the required tables created?</li>
+        </ul>
+      </div>
+    </div>
+  `;
+  document.getElementById("main-content").innerHTML = errorHtml;
+  updateRecordCounter(0);
 }
 
-function resetEmployeeForm() {
-  empFormTitle.textContent = 'Add New Employee';
-  empSubmitButton.textContent = 'Create Employee';
-  empErrorDiv.textContent = '';
-  empEditId = null;
-  empForm.reset();
-}
+async function loadData(
+  entity,
+  searchTerm = "",
+  filters = {},
+  page = 0,
+  append = false
+) {
+  if (isLoading || !hasMoreData) return;
 
-empForm.addEventListener('submit', async (evt) => {
-  evt.preventDefault();
-  empErrorDiv.textContent = '';
+  setHeader(entity);
+  currentEntity = entity;
+  const config = tableConfigs[entity];
+  if (!config) return;
 
-  const payload = {
-    initials: empForm.initials.value.trim() || null,
-    given_name: empForm.given_name.value.trim(),
-    nick_name: empForm.nick_name.value.trim() || null,
-    family_name: empForm.family_name.value.trim(),
-    family_name_prefix: empForm.family_prefix.value.trim() || null,
-    family_name_partner: empForm.family_partner.value.trim() || null,
-    family_name_partner_prefix: empForm.family_partner_prefix.value.trim() || null,
-    name_convention: empForm.name_convention.value,
-    date_of_birth: empForm.date_of_birth.value,
-    email: empForm.email.value.trim(),
-    phone_number: empForm.phone_number.value.trim() || null,
-    hire_date: empForm.hire_date.value,
-    termination_date: empForm.termination_date.value || null,
-    is_archived: empForm.is_archived.value === 'true',
-  };
-
-  if (!payload.given_name || !payload.family_name || !payload.name_convention || !payload.date_of_birth || !payload.email || !payload.hire_date) {
-    empErrorDiv.textContent = 'Please fill in all required (*) fields.';
-    return;
+  if (!append) {
+    document.getElementById("main-content").innerHTML =
+      '<div class="text-gray-400">Loading...</div>';
+  } else {
+    document.getElementById("loading-indicator").classList.remove("hidden");
   }
+
+  isLoading = true;
 
   try {
-    if (empEditId) {
-      await requestJSON(`${API_URL}/employees?id=eq.${empEditId}`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-      });
+    const isConnected = await checkApiConnection();
+    if (!isConnected) {
+      throw new Error("Cannot connect to PostgREST API");
+    }
+
+    const queryParams = buildQueryParams(searchTerm, filters, page);
+    const url = `${API_BASE}/${config.endpoint}${
+      queryParams ? `?${queryParams}` : ""
+    }`;
+
+    console.log("Fetching data from:", url);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(
+        `API Error: ${res.status} ${res.statusText}\n${errorText}`
+      );
+    }
+
+    const newData = await res.json();
+    hasMoreData = newData.length === pageSize;
+
+    if (append) {
+      currentData = [...currentData, ...newData];
     } else {
-      await requestJSON(`${API_URL}/employees`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-      });
+      currentData = newData;
     }
-    resetEmployeeForm();
-    loadEmployees();
-  } catch (err) {
-    empErrorDiv.textContent = err.message;
-  }
-});
 
-/** EMPLOYMENTS: CRUD + Archive **/
-const empmTableBody = document.querySelector('#employments-table tbody');
-const empmForm = document.getElementById('employment-form');
-const empmFormTitle = document.getElementById('employment-form-title');
-const empmSubmitButton = document.getElementById('empm-submit-button');
-const empmErrorDiv = document.getElementById('empm-form-error');
-const empmShowArchivedCheckbox = document.getElementById('show-archived-employments');
-let empmEditId = null;
-
-async function loadEmployments() {
-  empmTableBody.innerHTML = '';
-  const showArchived = empmShowArchivedCheckbox.checked;
-  const filter = showArchived ? '' : '?is_archived=eq.false';
-  try {
-    const employments = await requestJSON(`${API_URL}/employments${filter}&order=id.asc`);
-    if (employments.length === 0) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="7" style="text-align:center;">No employments found.</td>`;
-      empmTableBody.appendChild(tr);
-      return;
+    renderTable(entity, newData, append);
+    if (!append) {
+      renderAdvancedSearchFilters(entity);
+      setupInfiniteScroll();
+      setupScrollTopButton(); 
     }
-    for (const e of employments) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${e.id}</td>
-        <td>${e.employee_id}</td>
-        <td>${e.employment_start_date || ''}</td>
-        <td>${e.employment_end_date || ''}</td>
-        <td>${e.employment_status || ''}</td>
-        <td>${e.is_archived}</td>
-        <td class="actions">
-          <button class="edit" data-id="${e.id}">Edit</button>
-          <button class="archive" data-id="${e.id}">${e.is_archived ? 'Unarchive' : 'Archive'}</button>
-          <button class="delete" data-id="${e.id}">Delete</button>
-        </td>
-      `;
-      empmTableBody.appendChild(tr);
-    }
-  } catch (err) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="7" style="color:red;text-align:center;">Error: ${err.message}</td>`;
-    empmTableBody.appendChild(tr);
+  } catch (e) {
+    console.error("Data loading error:", e);
+    showError("Failed to load data", e.message);
+  } finally {
+    isLoading = false;
+    document.getElementById("loading-indicator").classList.add("hidden");
   }
 }
 
-empmShowArchivedCheckbox.addEventListener('change', () => {
-  resetEmploymentForm();
-  loadEmployments();
-});
+function renderAdvancedSearchFilters(entity) {
+  const config = tableConfigs[entity];
+  if (!config || !config.searchableFields) return;
 
-empmTableBody.addEventListener('click', async (evt) => {
-  const btn = evt.target;
-  if (!btn.dataset.id) return;
-  const id = btn.dataset.id;
-  if (btn.classList.contains('edit')) {
-    try {
-      const e = await requestJSON(`${API_URL}/employments?id=eq.${id}`);
-      if (!e.length) throw new Error('Employment not found');
-      populateEmploymentForm(e[0]);
-    } catch (err) {
-      empmErrorDiv.textContent = err.message;
-    }
-  } else if (btn.classList.contains('archive')) {
-    const shouldArchive = btn.textContent.trim() === 'Archive';
-    try {
-      await requestJSON(`${API_URL}/employments?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({is_archived: shouldArchive}),
-      });
-      resetEmploymentForm();
-      loadEmployments();
-    } catch (err) {
-      empmErrorDiv.textContent = err.message;
-    }
-  } else if (btn.classList.contains('delete')) {
-    if (!confirm('Delete permanently?')) return;
-    try {
-      await requestJSON(`${API_URL}/employments?id=eq.${id}`, {method: 'DELETE'});
-      resetEmploymentForm();
-      loadEmployments();
-    } catch (err) {
-      empmErrorDiv.textContent = err.message;
-    }
-  }
-});
+  const filtersContainer = document.getElementById("advanced-search-filters");
+  filtersContainer.innerHTML = "";
 
-function populateEmploymentForm(e) {
-  empmFormTitle.textContent = `Edit Employment (ID ${e.id})`;
-  empmSubmitButton.textContent = 'Update Employment';
-  empmErrorDiv.textContent = '';
-  empmEditId = e.id;
-  empmForm.employee_id.value = e.employee_id;
-  empmForm.employment_start_date.value = e.employment_start_date || '';
-  empmForm.employment_end_date.value = e.employment_end_date || '';
-  empmForm.employment_status.value = e.employment_status || '';
-  empmForm.is_archived.value = e.is_archived ? 'true' : 'false';
+  Object.entries(config.searchableFields).forEach(
+    ([field, { type, label }]) => {
+      const filterHtml = `
+      <div class="grid grid-cols-3 gap-4 items-center">
+        <label class="text-sm font-medium text-gray-700">${label}</label>
+        <div class="col-span-2">
+          ${
+            type === "text"
+              ? `
+            <input type="text" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   data-field="${field}"
+                   placeholder="Search ${label.toLowerCase()}">
+          `
+              : type === "date"
+              ? `
+            <input type="date" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   data-field="${field}">
+          `
+              : type === "number"
+              ? `
+            <input type="number" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   data-field="${field}"
+                   step="any">
+          `
+              : ""
+          }
+        </div>
+      </div>
+    `;
+      filtersContainer.insertAdjacentHTML("beforeend", filterHtml);
+    }
+  );
 }
 
-function resetEmploymentForm() {
-  empmFormTitle.textContent = 'Add New Employment';
-  empmSubmitButton.textContent = 'Create Employment';
-  empmErrorDiv.textContent = '';
-  empmEditId = null;
-  empmForm.reset();
+function setupScrollTopButton() {
+  const scrollTopBtn = document.getElementById('scroll-top-btn');
+  const tableContainer = document.getElementById('table-container');
+
+  if (!scrollTopBtn || !tableContainer) return;
+
+  // Remove existing listeners
+  tableContainer.onscroll = null;
+  scrollTopBtn.onclick = null;
+
+  tableContainer.addEventListener('scroll', () => {
+    scrollTopBtn.classList.toggle('hidden', tableContainer.scrollTop < 300);
+  });
+
+  scrollTopBtn.addEventListener('click', () => {
+    tableContainer.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 }
 
-empmForm.addEventListener('submit', async (evt) => {
-  evt.preventDefault();
-  empmErrorDiv.textContent = '';
-  const payload = {
-    employee_id: parseInt(empmForm.employee_id.value, 10),
-    employment_start_date: empmForm.employment_start_date.value,
-    employment_end_date: empmForm.employment_end_date.value || null,
-    employment_status: empmForm.employment_status.value.trim(),
-    is_archived: empmForm.is_archived.value === 'true',
-  };
-  if (!payload.employee_id || !payload.employment_start_date || !payload.employment_status) {
-    empmErrorDiv.textContent = 'Please fill in all required (*) fields.';
-    return;
-  }
-  try {
-    if (empmEditId) {
-      await requestJSON(`${API_URL}/employments?id=eq.${empmEditId}`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await requestJSON(`${API_URL}/employments`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-      });
-    }
-    resetEmploymentForm();
-    loadEmployments();
-  } catch (err) {
-    empmErrorDiv.textContent = err.message;
-  }
-});
+function setupInfiniteScroll() {
+  if (observer) observer.disconnect();
 
-/** POSITIONS: CRUD + Archive **/
-const posTableBody = document.querySelector('#positions-table tbody');
-const posForm = document.getElementById('position-form');
-const posFormTitle = document.getElementById('position-form-title');
-const posSubmitButton = document.getElementById('pos-submit-button');
-const posErrorDiv = document.getElementById('pos-form-error');
-const posShowArchivedCheckbox = document.getElementById('show-archived-positions');
-let posEditId = null;
+  const tableContainer = document.getElementById("table-container");
+  const loadingIndicator = document.getElementById("loading-indicator");
+  if (!tableContainer || !loadingIndicator) return;
 
-async function loadPositions() {
-  posTableBody.innerHTML = '';
-  const showArchived = posShowArchivedCheckbox.checked;
-  const filter = showArchived ? '' : '?is_archived=eq.false';
-  try {
-    const positions = await requestJSON(`${API_URL}/positions${filter}&order=id.asc`);
-    if (positions.length === 0) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="10" style="text-align:center;">No positions found.</td>`;
-      posTableBody.appendChild(tr);
-      return;
+  observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && !isLoading && hasMoreData) {
+          currentPage++;
+          const searchInput = document.getElementById("search-input");
+          loadData(
+            currentEntity,
+            searchInput.value,
+            activeFilters,
+            currentPage,
+            true
+          );
+        }
+      });
+    },
+    {
+      root: tableContainer,
+      threshold: 1.0,
     }
-    for (const p of positions) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${p.id}</td>
-        <td>${p.employment_id}</td>
-        <td>${p.department_id}</td>
-        <td>${p.team_id || ''}</td>
-        <td>${p.position_title || ''}</td>
-        <td>${p.start_date || ''}</td>
-        <td>${p.end_date || ''}</td>
-        <td>${p.location || ''}</td>
-        <td>${p.is_archived}</td>
-        <td class="actions">
-          <button class="edit" data-id="${p.id}">Edit</button>
-          <button class="archive" data-id="${p.id}">${p.is_archived ? 'Unarchive' : 'Archive'}</button>
-          <button class="delete" data-id="${p.id}">Delete</button>
-        </td>
-      `;
-      posTableBody.appendChild(tr);
-    }
-  } catch (err) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="10" style="color:red;text-align:center;">Error: ${err.message}</td>`;
-    posTableBody.appendChild(tr);
+  );
+
+  observer.observe(loadingIndicator);
+
+  const scrollTopBtn = document.getElementById("scroll-top-btn");
+  // const tableContainer = document.getElementById("table-container");
+
+  if (tableContainer && scrollTopBtn) {
+    tableContainer.addEventListener("scroll", () => {
+      scrollTopBtn.classList.toggle("hidden", tableContainer.scrollTop < 300);
+    });
+
+    scrollTopBtn.addEventListener("click", () => {
+      tableContainer.scrollTo({ top: 0, behavior: "smooth" });
+    });
   }
 }
 
-posShowArchivedCheckbox.addEventListener('change', () => {
-  resetPositionForm();
-  loadPositions();
-});
+// Event Listeners
+document.addEventListener("DOMContentLoaded", () => {
+  // Sidebar navigation
+  const menuItems = document.querySelectorAll(".menu-item");
+  menuItems.forEach((item) => {
+    item.addEventListener("click", function () {
+      const selected = this.getAttribute("data-menu");
+      menuItems.forEach((btn) =>
+        btn.classList.remove("bg-gray-300", "font-bold")
+      );
+      this.classList.add("bg-gray-300", "font-bold");
+      resetPagination();
+      loadData(selected);
+    });
+  });
 
-posTableBody.addEventListener('click', async (evt) => {
-  const btn = evt.target;
-  if (!btn.dataset.id) return;
-  const id = btn.dataset.id;
-  if (btn.classList.contains('edit')) {
-    try {
-      const p = await requestJSON(`${API_URL}/positions?id=eq.${id}`);
-      if (!p.length) throw new Error('Position not found');
-      populatePositionForm(p[0]);
-    } catch (err) {
-      posErrorDiv.textContent = err.message;
-    }
-  } else if (btn.classList.contains('archive')) {
-    const shouldArchive = btn.textContent.trim() === 'Archive';
-    try {
-      await requestJSON(`${API_URL}/positions?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({is_archived: shouldArchive}),
-      });
-      resetPositionForm();
-      loadPositions();
-    } catch (err) {
-      posErrorDiv.textContent = err.message;
-    }
-  } else if (btn.classList.contains('delete')) {
-    if (!confirm('Delete permanently?')) return;
-    try {
-      await requestJSON(`${API_URL}/positions?id=eq.${id}`, {method: 'DELETE'});
-      resetPositionForm();
-      loadPositions();
-    } catch (err) {
-      posErrorDiv.textContent = err.message;
-    }
-  }
-});
+  // Quick search with debounce
+  const searchInput = document.getElementById("search-input");
+  let searchTimeout;
+  searchInput.addEventListener("input", (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      const searchTerm = e.target.value;
+      resetPagination();
+      loadData(currentEntity, searchTerm, activeFilters);
+    }, 300);
+  });
 
-function populatePositionForm(p) {
-  posFormTitle.textContent = `Edit Position (ID ${p.id})`;
-  posSubmitButton.textContent = 'Update Position';
-  posErrorDiv.textContent = '';
-  posEditId = p.id;
-  posForm.employment_id.value = p.employment_id;
-  posForm.department_id.value = p.department_id;
-  posForm.team_id.value = p.team_id || '';
-  posForm.position_title.value = p.position_title || '';
-  posForm.start_date.value = p.start_date || '';
-  posForm.end_date.value = p.end_date || '';
-  posForm.location.value = p.location || '';
-  posForm.is_archived.value = p.is_archived ? 'true' : 'false';
-}
+  // Advanced search modal
+  const modal = document.getElementById("advanced-search-modal");
+  const advancedSearchBtn = document.getElementById("advanced-search-btn");
+  const closeModalBtn = document.getElementById("close-modal");
+  const resetFiltersBtn = document.getElementById("reset-filters");
+  const applyFiltersBtn = document.getElementById("apply-filters");
 
-function resetPositionForm() {
-  posFormTitle.textContent = 'Add New Position';
-  posSubmitButton.textContent = 'Create Position';
-  posErrorDiv.textContent = '';
-  posEditId = null;
-  posForm.reset();
-}
+  advancedSearchBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+  });
 
-posForm.addEventListener('submit', async (evt) => {
-  evt.preventDefault();
-  posErrorDiv.textContent = '';
-  const payload = {
-    employment_id: parseInt(posForm.employment_id.value, 10),
-    department_id: parseInt(posForm.department_id.value, 10),
-    team_id: posForm.team_id.value ? parseInt(posForm.team_id.value, 10) : null,
-    position_title: posForm.position_title.value.trim(),
-    start_date: posForm.start_date.value,
-    end_date: posForm.end_date.value || null,
-    location: posForm.location.value.trim() || null,
-    is_archived: posForm.is_archived.value === 'true',
-  };
-  if (!payload.employment_id || !payload.department_id || !payload.position_title || !payload.start_date) {
-    posErrorDiv.textContent = 'Please fill in all required (*) fields.';
-    return;
-  }
-  try {
-    if (posEditId) {
-      await requestJSON(`${API_URL}/positions?id=eq.${posEditId}`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await requestJSON(`${API_URL}/positions`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
+  closeModalBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+
+  resetFiltersBtn.addEventListener("click", () => {
+    activeFilters = {};
+    const inputs = document.querySelectorAll("#advanced-search-filters input");
+    inputs.forEach((input) => (input.value = ""));
+    resetPagination();
+    loadData(currentEntity, searchInput.value, {});
+  });
+
+  applyFiltersBtn.addEventListener("click", () => {
+    activeFilters = {};
+    const inputs = document.querySelectorAll("#advanced-search-filters input");
+    inputs.forEach((input) => {
+      if (input.value) {
+        const field = input.dataset.field;
+        const type = tableConfigs[currentEntity].searchableFields[field].type;
+        activeFilters[field] =
+          type === "number" ? Number(input.value) : input.value;
+      }
+    });
+    resetPagination();
+    loadData(currentEntity, searchInput.value, activeFilters);
+    modal.classList.add("hidden");
+  });
+
+  // Initial load
+  document
+    .querySelector('.menu-item[data-menu="Contracts"]')
+    .classList.add("bg-gray-300", "font-bold");
+  loadData("Contracts");
+  setupInfiniteScroll();
+
+  const scrollTopBtn = document.getElementById("scroll-top-btn");
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const tableContainer = document.getElementById("table-container");
+    if (tableContainer) {
+      tableContainer.addEventListener("scroll", () => {
+        scrollTopBtn.classList.toggle("hidden", tableContainer.scrollTop < 300);
       });
     }
-    resetPositionForm();
-    loadPositions();
-  } catch (err) {
-    posErrorDiv.textContent = err.message;
-  }
-});
 
-/** INITIAL LOAD **/
-window.addEventListener('DOMContentLoaded', () => {
-  loadEmployees();
-  loadEmployments();
-  loadPositions();
+    scrollTopBtn.addEventListener("click", () => {
+      tableContainer.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
 });
