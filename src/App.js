@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { Admin } from "react-admin";
+import React from "react";
+import { Admin, Resource } from "react-admin";
 import dataProvider from "./dataProvider";
-import { introspectDatabase } from "./schema/introspect";
-import { DynamicResources } from "./dynamic/DynamicResources";
 import { CssBaseline, AppBar, Toolbar, Typography, Box } from "@mui/material";
-import config from "./config";
+import { ContractList, ContractEdit, ContractCreate } from "./resources/contracts";
+import { DepartmentList, DepartmentEdit, DepartmentCreate } from "./resources/departments";
 
 // Fixed header bar
 const MyAppBar = () => (
@@ -28,37 +27,24 @@ const MyLayout = ({ children }) => (
 );
 
 const App = () => {
-  const [tables, setTables] = useState([]);
-  const [schemas, setSchemas] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    introspectDatabase(config.apiUrl)
-      .then(({ tables, schemas }) => {
-        setTables(tables);
-        setSchemas(schemas);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError("Failed to load schema from PostgREST. " + err.message);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) return <div>Loading schema...</div>;
-  if (error) return <div style={{ color: "red" }}>{error}</div>;
-
-  // Pass schemas to config for use in dynamic fields
-  const mergedConfig = { ...config, schemas };
-
   return (
     <Admin
       dataProvider={dataProvider}
       layout={MyLayout}
       disableTelemetry
     >
-      <DynamicResources tables={tables} schemas={schemas} config={mergedConfig} />
+      <Resource
+        name="contracts"
+        list={ContractList}
+        edit={ContractEdit}
+        create={ContractCreate}
+      />
+      <Resource
+        name="departments"
+        list={DepartmentList}
+        edit={DepartmentEdit}
+        create={DepartmentCreate}
+      />
     </Admin>
   );
 };
