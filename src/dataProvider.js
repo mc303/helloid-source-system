@@ -2,7 +2,12 @@ import postgrestRestProvider from "@raphiniert/ra-data-postgrest";
 import config from "./config";
 const apiUrl = config.apiUrl;
 
-const baseDataProvider = postgrestRestProvider(apiUrl, {});
+const baseDataProvider = postgrestRestProvider(apiUrl, {
+    primaryKeys: new Map([
+        ['contracts', ['contract_id']],
+        ['departments', ['external_id']]
+    ])
+});
 
 const wrappedDataProvider = {};
 

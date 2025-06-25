@@ -7,7 +7,7 @@ import {
 export const ContractList = props => (
     <List {...props}>
         <Datagrid rowClick="edit">
-            <TextField source="id" />
+            <TextField source="contract_id" label="Contract ID" />
             <TextField source="name" />
             <TextField source="start_date" />
             <TextField source="end_date" />
@@ -23,7 +23,7 @@ export const ContractList = props => (
 export const ContractEdit = props => (
     <Edit {...props}>
         <SimpleForm>
-            <TextInput source="id" disabled />
+            <TextInput source="contract_id" disabled />
             <TextInput source="name" />
             <DateInput source="start_date" />
             <DateInput source="end_date" />

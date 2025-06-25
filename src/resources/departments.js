@@ -7,7 +7,7 @@ import {
 export const DepartmentList = props => (
     <List {...props}>
         <Datagrid rowClick="edit">
-            <TextField source="id" />
+            <TextField source="external_id" label="External ID" />
             <TextField source="name" />
             <EditButton />
             <DeleteButton />
@@ -18,7 +18,7 @@ export const DepartmentList = props => (
 export const DepartmentEdit = props => (
     <Edit {...props}>
         <SimpleForm>
-            <TextInput source="id" disabled />
+            <TextInput source="external_id" disabled />
             <TextInput source="name" />
         </SimpleForm>
     </Edit>
