@@ -4,7 +4,7 @@ export function useSchema() {
   const [tables, setTables] = useState([]);
   const [schemas, setSchemas] = useState({});
   useEffect(() => {
-    fetch('http://db-hid-source:3000/')
+    fetch('http://postgrest-hid-source:3000/')
       .then(res => res.json())
       .then(meta => {
         const tableNames = Object.keys(meta).filter(name => !name.startsWith('_'));
