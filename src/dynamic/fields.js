@@ -4,7 +4,7 @@ import {
   Edit, SimpleForm, TextInput, ReferenceInput, SelectInput,
   Create, TopToolbar, ExportButton
 } from "react-admin";
-import { Box } from "@mui/material";
+import { Box, Button } from "@mui/material";
 import AdvancedSearchDialog from "../components/AdvancedSearchDialog";
 
 // Helper to pick display field for reference (e.g. name, display_name)
@@ -21,28 +21,52 @@ function pickReferenceField(refTable, schemas, config) {
 
 // Render toolbar with search bar and advanced modal
 function ListActions({ resource, onSearch, onAdvanced, search, setSearch }) {
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    onSearch();
+  };
+
   return (
     <TopToolbar>
       <Box sx={{ width: "100%", px: 2, pt: 1 }}>
-        <Box display="flex" alignItems="center" gap={1}>
+        <Box component="form" onSubmit={handleSearchSubmit} display="flex" alignItems="center" gap={1}>
           <TextInput
             label=""
             placeholder="Search..."
             variant="outlined"
             size="small"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             sx={{ flexGrow: 1 }}
-            source="q"
+            // The source prop is not needed here as we control the state manually
           />
-          <button onClick={onSearch} style={{marginLeft: 8}}>Search</button>
-          <button onClick={onAdvanced} style={{marginLeft: 4}}>Advanced</button>
+          <Button type="submit" variant="contained" size="small">Search</Button>
+          <Button onClick={onAdvanced} size="small">Advanced</Button>
         </Box>
       </Box>
       <ExportButton />
     </TopToolbar>
   );
 }
+
+// Reusable form component for Create and Edit views to reduce duplication
+const ResourceForm = ({ schema, table, config, view }) => {
+  const schemas = config.schemas || {};
+  return (
+    <SimpleForm>
+      {schema.columns.map(col => {
+        const hide = config?.overrides?.[table]?.[view]?.hide?.includes(col.name);
+        if (hide) return null;
+        if (schema.foreignKeys[col.name]) {
+          const refTable = schema.foreignKeys[col.name].refTable;
+          const refField = pickReferenceField(refTable, schemas, config);
+          return <ReferenceInput key={col.name} source={col.name} reference={refTable} label={col.name}><SelectInput optionText={refField} /></ReferenceInput>;
+        }
+        return <TextInput key={col.name} source={col.name} label={col.name} />;
+      })}
+    </SimpleForm>
+  );
+};
 
 // Generate all CRUD components for a resource
 export function makeResourceCrud(table, schema, config) {
@@ -110,52 +134,17 @@ export function makeResourceCrud(table, schema, config) {
 
   // Edit
   const EditComponent = props => (
-    <Edit {...props} resource={table}>
-      <SimpleForm>
-        {schema.columns.map(col => {
-          const hide = config?.overrides?.[table]?.edit?.hide?.includes(col.name);
-          if (hide) return null;
-          if (schema.foreignKeys[col.name]) {
-            const refTable = schema.foreignKeys[col.name].refTable;
-            const refField = pickReferenceField(refTable, schemas, config);
-            return (
-              <ReferenceInput key={col.name} source={col.name} reference={refTable} label={col.name}>
-                <SelectInput optionText={refField} />
-              </ReferenceInput>
-            );
-          }
-          return <TextInput key={col.name} source={col.name} label={col.name} />;
-        })}
-      </SimpleForm>
+    <Edit {...props} resource={table} >
+      <ResourceForm schema={schema} table={table} config={config} view="edit" />
     </Edit>
   );
 
   // Create
   const CreateComponent = props => (
     <Create {...props} resource={table}>
-      <SimpleForm>
-        {schema.columns.map(col => {
-          const hide = config?.overrides?.[table]?.create?.hide?.includes(col.name);
-          if (hide) return null;
-          if (schema.foreignKeys[col.name]) {
-            const refTable = schema.foreignKeys[col.name].refTable;
-            const refField = pickReferenceField(refTable, schemas, config);
-            return (
-              <ReferenceInput key={col.name} source={col.name} reference={refTable} label={col.name}>
-                <SelectInput optionText={refField} />
-              </ReferenceInput>
-            );
-          }
-          return <TextInput key={col.name} source={col.name} label={col.name} />;
-        })}
-      </SimpleForm>
+      <ResourceForm schema={schema} table={table} config={config} view="create" />
     </Create>
   );
-
-  // Attach schemas for reference field helpers
-  ListComponent.defaultProps = { schemas };
-  EditComponent.defaultProps = { schemas };
-  CreateComponent.defaultProps = { schemas };
 
   return { List: ListComponent, Edit: EditComponent, Create: CreateComponent };
 }

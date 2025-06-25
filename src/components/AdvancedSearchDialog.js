@@ -7,10 +7,8 @@ export default function AdvancedSearchDialog({ open, onClose, resource }) {
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Advanced Search - {resource}</DialogTitle>
       <DialogContent>
-        <div>
-          {/* Add complex search controls here */}
-          <p>Coming soon. (You can extend this dialog with custom search fields.)</p>
-        </div>
+        {/* Add complex search controls here */}
+        <p>Coming soon. (You can extend this dialog with custom search fields.)</p>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
