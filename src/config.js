@@ -1,6 +1,6 @@
 // You can override resource labels, hide columns, set reference display fields, etc here.
 const config = {
-  apiUrl: "http://db-hid-source:3000",
+  apiUrl: "http://postgrest-hid-source:3000",
   // Example:
   overrides: {
     // persons: {

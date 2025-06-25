@@ -11,7 +11,7 @@ export function useSchema() {
         setTables(tableNames);
         return Promise.all(
           tableNames.map(table =>
-            fetch(`http://db-hid-source:3000/${table}`, { method: 'OPTIONS' })
+            fetch(`http://postgrest-hid-source:3000/${table}`, { method: 'OPTIONS' })
               .then(res => res.json())
               .then(options => ({ [table]: parseOptions(options) }))
           )
