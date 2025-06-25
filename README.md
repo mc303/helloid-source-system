@@ -1,3 +1,0 @@
-# helloid-hr-system
-
-test
