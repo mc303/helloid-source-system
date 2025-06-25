@@ -26,8 +26,11 @@ for (const method in baseDataProvider) {
                 });
         };
     } else {
-        // Copy non-function properties directly (e.g., if it exposes apiUrl directly)
-        wrappedDataProvider[method] = baseDataProvider[method];
+        // Use getters for non-function properties to ensure correct access
+        Object.defineProperty(wrappedDataProvider, method, {
+            get: () => baseDataProvider[method],
+            enumerable: true // Make the property visible during iteration
+        });
     }
 }
 
