@@ -13,7 +13,7 @@ for (const method in baseDataProvider) {
         wrappedDataProvider[method] = (...args) => {
             // Wrap in a new promise chain to catch both synchronous errors and asynchronous rejections
             return Promise.resolve()
-                .then(() => baseDataProvidermethod)
+                .then(() => baseDataProvider[method](...args))
                 .catch(error => {
                     console.error(`Error in dataProvider method "${method}":`, error);
                     const err = error instanceof Error ? error : new Error(error.message || String(error));
