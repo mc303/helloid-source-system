@@ -11,12 +11,14 @@ const wrappedDataProvider = {};
 for (const method in baseDataProvider) {
     if (typeof baseDataProvider[method] === 'function') {
         wrappedDataProvider[method] = (...args) => {
-            return baseDataProvider[method](...args).catch(error => {
-                console.error(`Error in dataProvider method "${method}":`, error);
-                // Ensure the error is a proper Error object if it's not already
-                const err = error instanceof Error ? error : new Error(error.message || String(error));
-                return Promise.reject(err);
-            });
+            // Wrap in a new promise chain to catch both synchronous errors and asynchronous rejections
+            return Promise.resolve()
+                .then(() => baseDataProvidermethod)
+                .catch(error => {
+                    console.error(`Error in dataProvider method "${method}":`, error);
+                    const err = error instanceof Error ? error : new Error(error.message || String(error));
+                    return Promise.reject(err);
+                });
         };
     } else {
         // Copy non-function properties directly (e.g., if it exposes apiUrl directly)
