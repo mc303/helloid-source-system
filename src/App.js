@@ -1,6 +1,7 @@
 import React from "react";
 import { Admin, Resource } from "react-admin";
-import dataProvider from "./dataProvider";
+import postgrestRestProvider from "@raphiniert/ra-data-postgrest"; // Import directly
+import config from "./config"; // Assuming config.js exists and has apiUrl
 import { CssBaseline, AppBar, Toolbar, Typography, Box } from "@mui/material";
 import { ContractList, ContractEdit, ContractCreate } from "./resources/contracts";
 import { DepartmentList, DepartmentEdit, DepartmentCreate } from "./resources/departments";
@@ -29,7 +30,7 @@ const MyLayout = ({ children }) => (
 const App = () => {
   return (
     <Admin
-      dataProvider={dataProvider}
+      dataProvider={postgrestRestProvider(config.apiUrl, {})} // Use directly
       layout={MyLayout}
       disableTelemetry
     >
